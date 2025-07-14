@@ -1,14 +1,14 @@
 import logging
-from datetime import datetime, timedelta
-from telegram import Update, ChatPermissions
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import sqlite3
 import asyncio
+from datetime import datetime, timedelta
+from telegram import Update, ChatPermissions
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, ContextTypes
+)
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# Подключение к базе данных
 conn = sqlite3.connect("moderation.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''
@@ -22,7 +22,6 @@ c.execute('''
 ''')
 conn.commit()
 
-# --- Вспомогательные функции ---
 async def update_user(user_id, chat_id):
     c.execute("SELECT * FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
     if not c.fetchone():
@@ -40,7 +39,7 @@ def parse_duration(duration: str):
     except:
         return None
 
-async def unmute_later(context: ContextTypes.DEFAULT_TYPE, chat_id, user_id, until):
+async def unmute_later(context, chat_id, user_id, until):
     delay = (until - datetime.utcnow()).total_seconds()
     await asyncio.sleep(delay)
     permissions = ChatPermissions(can_send_messages=True)
@@ -48,7 +47,6 @@ async def unmute_later(context: ContextTypes.DEFAULT_TYPE, chat_id, user_id, unt
     c.execute("UPDATE users SET mute_until=NULL WHERE user_id=? AND chat_id=?", (user_id, chat_id))
     conn.commit()
 
-# --- Команды ---
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Используйте /warn в ответ на сообщение пользователя.")
@@ -78,7 +76,6 @@ async def mut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not context.args:
         await update.message.reply_text("Используйте /mut в ответ на сообщение: /mut 5m")
         return
-
     user = update.message.reply_to_message.from_user
     chat_id = update.effective_chat.id
     duration = context.args[0]
@@ -148,8 +145,7 @@ async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "♻️ <b>/unwarn</b> — убрать предупреждение.\n"
         "🔇 <b>/mut 5m</b> — замутить пользователя на указанное время (например, 5m, 2h).\n"
         "🔊 <b>/unmut</b> — снять мут досрочно.\n"
-        "🔨 <b>/ban</b> — забанить (удалить) пользователя из группы.\n"
-        "📊 <b>/rep</b> — посмотреть репутацию пользователя (преды и муты).\n"
+        "📊 <b>/rep</b> — посмотреть репутацию пользователя.\n"
         "📋 <b>/admininfo</b> — список всех админ-команд.\n\n"
         "⏳ <i>Автоматически:</i>\n"
         "— После двух /warn пользователь мутится на 24ч.\n"
@@ -157,9 +153,8 @@ async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(commands_text, parse_mode="HTML")
 
-# --- Основная функция ---
 async def main():
-    app = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
+    app = ApplicationBuilder().token("8093659364:AAEWyrlmCdb5xFqBvlNE8HWBtXl0n9qdpig").build()
 
     app.add_handler(CommandHandler("warn", warn))
     app.add_handler(CommandHandler("mut", mut))
@@ -168,9 +163,8 @@ async def main():
     app.add_handler(CommandHandler("rep", rep))
     app.add_handler(CommandHandler("admininfo", admininfo))
 
-    print("✅ Бот запущен...")
+    print("Бот запущен...")
     await app.run_polling()
 
-# Запуск
 if __name__ == "__main__":
     asyncio.run(main())
