@@ -1,27 +1,31 @@
 import asyncio
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
 
-async def start(update, context):
-    await update.message.reply_text("Привет!")
 
+# Функция обработки команды /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Привет! Я Helpy бот.")
+
+
+# Функция обработки команды /help
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Напиши /start чтобы начать.")
+
+
+# Главная асинхронная функция
 async def main():
+    # Инициализируем приложение с токеном
     app = ApplicationBuilder().token("8093659364:AAEWyrlmCdb5xFqBvlNE8HWBtXl0n9qdpig").build()
 
+    # Регистрируем обработчики команд
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
 
-    # Запускаем polling в уже существующем event loop
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-    
-    # Ждём завершения
-    await app.updater.wait()
-    await app.stop()
-    await app.shutdown()
+    # Запускаем бота
+    await app.run_polling()
 
-# Вместо asyncio.run()
+
+# Точка входа
 if __name__ == "__main__":
-    try:
-        asyncio.get_event_loop().run_until_complete(main())
-    except RuntimeError as e:
-        print(f"RuntimeError: {e}")
+    asyncio.run(main())
