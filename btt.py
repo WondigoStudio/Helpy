@@ -4,9 +4,11 @@ from telegram import Update, ChatPermissions
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import sqlite3
 import asyncio
- 
+
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
- 
+
+# Подключение к базе данных
 conn = sqlite3.connect("moderation.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''
@@ -19,13 +21,34 @@ c.execute('''
     )
 ''')
 conn.commit()
- 
+
+# --- Вспомогательные функции ---
 async def update_user(user_id, chat_id):
     c.execute("SELECT * FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
     if not c.fetchone():
         c.execute("INSERT INTO users (user_id, chat_id, warns, mutes) VALUES (?, ?, 0, 0)", (user_id, chat_id))
         conn.commit()
- 
+
+def parse_duration(duration: str):
+    try:
+        if duration.endswith("m"):
+            return int(duration[:-1]) * 60
+        elif duration.endswith("h"):
+            return int(duration[:-1]) * 3600
+        elif duration.endswith("d"):
+            return int(duration[:-1]) * 86400
+    except:
+        return None
+
+async def unmute_later(context: ContextTypes.DEFAULT_TYPE, chat_id, user_id, until):
+    delay = (until - datetime.utcnow()).total_seconds()
+    await asyncio.sleep(delay)
+    permissions = ChatPermissions(can_send_messages=True)
+    await context.bot.restrict_chat_member(chat_id, user_id, permissions)
+    c.execute("UPDATE users SET mute_until=NULL WHERE user_id=? AND chat_id=?", (user_id, chat_id))
+    conn.commit()
+
+# --- Команды ---
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Используйте /warn в ответ на сообщение пользователя.")
@@ -50,15 +73,16 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         await update.message.reply_text(f"{user.mention_html()} замучен на 24 часа за 2 предупреждения.", parse_mode='HTML')
         asyncio.create_task(unmute_later(context, chat_id, user.id, until))
- 
+
 async def mut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not context.args:
         await update.message.reply_text("Используйте /mut в ответ на сообщение: /mut 5m")
         return
+
     user = update.message.reply_to_message.from_user
     chat_id = update.effective_chat.id
     duration = context.args[0]
- 
+
     seconds = parse_duration(duration)
     if seconds is None:
         await update.message.reply_text("Неверный формат времени. Примеры: 5m, 2h, 1d")
@@ -72,7 +96,7 @@ async def mut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     await update.message.reply_text(f"{user.mention_html()} замучен на {duration}.", parse_mode='HTML')
     asyncio.create_task(unmute_later(context, chat_id, user.id, until))
- 
+
 async def unmut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Используйте /unmut в ответ на сообщение пользователя.")
@@ -85,7 +109,7 @@ async def unmut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c.execute("UPDATE users SET mute_until=NULL WHERE user_id=? AND chat_id=?", (user.id, chat_id))
     conn.commit()
     await update.message.reply_text(f"{user.mention_html()} размучен.", parse_mode='HTML')
- 
+
 async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Используйте /unwarn в ответ на сообщение пользователя.")
@@ -101,21 +125,7 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Предупреждение снято. Осталось: {warns[0]-1}")
     else:
         await update.message.reply_text("У пользователя нет предупреждений.")
-async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    commands_text = (
-        "🛠 <b>Команды администратора:</b>\n\n"
-        "⚠️ <b>/warn @user</b> — выдать предупреждение. После 2-х — мут на 24 часа.\n"
-        "♻️ <b>/unwarn @user</b> — убрать предупреждение.\n"
-        "🔇 <b>/mut @user 5m</b> — замутить пользователя на указанное время (например, 5m, 2h).\n"
-        "🔊 <b>/unmut @user</b> — снять мут досрочно.\n"
-        "🔨 <b>/ban @user</b> — забанить (удалить) пользователя из группы.\n"
-        "📊 <b>/rep @user</b> — посмотреть репутацию пользователя (преды и муты).\n"
-        "📋 <b>/admininfo</b> — список всех админ-команд.\n\n"
-        "⏳ <i>Автоматически:</i>\n"
-        "— После двух /warn пользователь мутится на 24ч.\n"
-        "— После 24ч мута — размут и обнуление предупреждений.\n"
-    )
-    await update.message.reply_text(commands_text, parse_mode="HTML")
+
 async def rep(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Используйте /rep в ответ на сообщение пользователя.")
@@ -130,28 +140,26 @@ async def rep(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"Статистика {user.mention_html()}\nПредупреждений: {warns}\nМутов: {mutes}\nСостояние: {mute_status}",
         parse_mode='HTML')
- 
-async def unmute_later(context, chat_id, user_id, until):
-    delay = (until - datetime.utcnow()).total_seconds()
-    await asyncio.sleep(delay)
-    permissions = ChatPermissions(can_send_messages=True)
-    await context.bot.restrict_chat_member(chat_id, user_id, permissions)
-    c.execute("UPDATE users SET mute_until=NULL WHERE user_id=? AND chat_id=?", (user_id, chat_id))
-    conn.commit()
- 
-def parse_duration(duration: str):
-    try:
-        if duration.endswith("m"):
-            return int(duration[:-1]) * 60
-        elif duration.endswith("h"):
-            return int(duration[:-1]) * 3600
-        elif duration.endswith("d"):
-            return int(duration[:-1]) * 86400
-    except:
-        return None
- 
+
+async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    commands_text = (
+        "🛠 <b>Команды администратора:</b>\n\n"
+        "⚠️ <b>/warn</b> — выдать предупреждение. После 2-х — мут на 24 часа.\n"
+        "♻️ <b>/unwarn</b> — убрать предупреждение.\n"
+        "🔇 <b>/mut 5m</b> — замутить пользователя на указанное время (например, 5m, 2h).\n"
+        "🔊 <b>/unmut</b> — снять мут досрочно.\n"
+        "🔨 <b>/ban</b> — забанить (удалить) пользователя из группы.\n"
+        "📊 <b>/rep</b> — посмотреть репутацию пользователя (преды и муты).\n"
+        "📋 <b>/admininfo</b> — список всех админ-команд.\n\n"
+        "⏳ <i>Автоматически:</i>\n"
+        "— После двух /warn пользователь мутится на 24ч.\n"
+        "— После 24ч мута — размут и обнуление предупреждений.\n"
+    )
+    await update.message.reply_text(commands_text, parse_mode="HTML")
+
+# --- Основная функция ---
 async def main():
-    app = ApplicationBuilder().token("8093659364:AAEWyrlmCdb5xFqBvlNE8HWBtXl0n9qdpig").build()
+    app = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
 
     app.add_handler(CommandHandler("warn", warn))
     app.add_handler(CommandHandler("mut", mut))
@@ -160,10 +168,9 @@ async def main():
     app.add_handler(CommandHandler("rep", rep))
     app.add_handler(CommandHandler("admininfo", admininfo))
 
-    print("Бот запущен...")
+    print("✅ Бот запущен...")
     await app.run_polling()
 
+# Запуск
 if __name__ == "__main__":
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
