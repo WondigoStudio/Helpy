@@ -166,10 +166,9 @@ async def main():
     print("Бот запущен...")
     await app.run_polling()
 if __name__ == "__main__":
-    import asyncio
+    import nest_asyncio
+    nest_asyncio.apply()
 
-    try:
-        asyncio.get_running_loop().create_task(main())
-    except RuntimeError:
-        asyncio.run(main())
+    # Без проверки get_running_loop, просто запускаем
+    asyncio.run(main())
 
