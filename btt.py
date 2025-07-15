@@ -255,7 +255,7 @@ async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     await start_web_app()
-    app = ApplicationBuilder().token("8093659364:AAGuO6e9QSzTfGlLOmgr57NJqW3a7yrq4Gg").build()
+    app = ApplicationBuilder().token("8093659364:AAGsA9q45FSOomZFM-eeB4RrrL5TW1ZZQvg").build()
     
     app.add_handler(CommandHandler("warn", warn))
     app.add_handler(CommandHandler("mut", mut))
