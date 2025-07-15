@@ -9,10 +9,7 @@ from flask import Flask
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes
 )
- 
-@app.route('/')
-def index():
-    return "Сервер работает!"
+  
 async def start_web_app():
     app = web.Application()
     app.router.add_get("/", handle)
