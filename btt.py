@@ -153,60 +153,19 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("У пользователя нет предупреждений.")
 
 async def rep(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-
-    # 1. Если есть ответ на сообщение — используем его
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-
-    # 2. Иначе пытаемся вытащить @username или ID из аргумента
-    elif context.args:
-        arg = context.args[0]
-
-        # Удаляем @ если есть
-        arg = arg.lstrip('@')
-
-        try:
-            # Если это ID (число)
-            if arg.isdigit():
-                user_id = int(arg)
-            else:
-                # Получаем пользователя по username
-                member = await context.bot.get_chat_member(chat_id, arg)
-                user_id = member.user.id
-
-            # Получаем объект пользователя
-            member = await context.bot.get_chat_member(chat_id, user_id)
-            user: User = member.user
-
-        except Exception as e:
-            await update.message.reply_text("Пользователь не найден.")
-            return
-    else:
-        await update.message.reply_text("Используйте /rep в ответ на сообщение или укажите @username / ID.")
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Используйте /rep в ответ на сообщение пользователя.")
         return
 
-    # Обновляем или создаём запись пользователя
+    user = update.message.reply_to_message.from_user
+    chat_id = update.effective_chat.id
     await update_user(user.id, chat_id)
-
-    # Получаем данные из БД
     c.execute("SELECT warns, mutes, mute_until FROM users WHERE user_id=? AND chat_id=?", (user.id, chat_id))
-    result = c.fetchone()
-
-    if result:
-        warns, mutes, mute_until = result
-    else:
-        warns, mutes, mute_until = 0, 0, None
-
+    warns, mutes, mute_until = c.fetchone()
     mute_status = "Мут до " + mute_until if mute_until else "Не в муте"
-
     await update.message.reply_text(
-        f"Статистика {user.mention_html()}\n"
-        f"Предупреждений: {warns}\n"
-        f"Мутов: {mutes}\n"
-        f"Состояние: {mute_status}",
-        parse_mode='HTML'
-    )
+        f"Статистика {user.mention_html()}\nПредупреждений: {warns}\nМутов: {mutes}\nСостояние: {mute_status}",
+        parse_mode='HTML')
     
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
