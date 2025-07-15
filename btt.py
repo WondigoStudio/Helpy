@@ -10,13 +10,7 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes
 )
   
-async def start_web_app():
-    app = web.Application()
-    app.router.add_get("/", handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 3000)
-    await site.start()
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,7 +29,13 @@ conn.commit()
 async def handle(request):
     return web.Response(text="Бот работает!")
 
-
+async def start_web_app():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 3000)
+    await site.start()
     
 def parse_duration(duration: str):
     try:
@@ -266,7 +266,7 @@ async def main():
     app.add_handler(CommandHandler("admininfo", admininfo))
 
     print("Бот запущен...")
-    asyncio.run(main())
+    await app.run_polling()  # Не вызывай asyncio.run() тут
     
 if __name__ == "__main__":
     import nest_asyncio
