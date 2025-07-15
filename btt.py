@@ -42,7 +42,17 @@ def parse_duration(duration: str):
 async def unmute_later(context, chat_id, user_id, until):
     delay = (until - datetime.utcnow()).total_seconds()
     await asyncio.sleep(delay)
-    permissions = ChatPermissions(can_send_messages=True)
+    permissions = ChatPermissions(
+        can_send_messages=True,
+        can_send_media_messages=True,
+        can_send_polls=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+        can_change_info=True,
+        can_invite_users=True,
+        can_pin_messages=True
+    )
+
     await context.bot.restrict_chat_member(chat_id, user_id, permissions)
     c.execute("UPDATE users SET mute_until=NULL WHERE user_id=? AND chat_id=?", (user_id, chat_id))
     conn.commit()
@@ -71,6 +81,7 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         await update.message.reply_text(f"{user.mention_html()} замучен на 24 часа за 2 предупреждения.", parse_mode='HTML')
         asyncio.create_task(unmute_later(context, chat_id, user.id, until))
+ 
 
 async def mut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not context.args:
@@ -79,7 +90,7 @@ async def mut(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.reply_to_message.from_user
     chat_id = update.effective_chat.id
     duration = context.args[0]
-
+ 
     seconds = parse_duration(duration)
     if seconds is None:
         await update.message.reply_text("Неверный формат времени. Примеры: 5m, 2h, 1d")
@@ -101,7 +112,17 @@ async def unmut(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.message.reply_to_message.from_user
     chat_id = update.effective_chat.id
-    permissions = ChatPermissions(can_send_messages=True)
+    permissions = ChatPermissions(
+        can_send_messages=True,
+        can_send_media_messages=True,
+        can_send_polls=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+        can_change_info=True,
+        can_invite_users=True,
+        can_pin_messages=True
+    )
+
     await context.bot.restrict_chat_member(chat_id, user.id, permissions)
     c.execute("UPDATE users SET mute_until=NULL WHERE user_id=? AND chat_id=?", (user.id, chat_id))
     conn.commit()
@@ -137,15 +158,31 @@ async def rep(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"Статистика {user.mention_html()}\nПредупреждений: {warns}\nМутов: {mutes}\nСостояние: {mute_status}",
         parse_mode='HTML')
+    
+async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message:
+        await update.message.reply_text("⚠️ Эта команда должна быть ответом на сообщение пользователя.")
+        return
 
+    user_to_ban = update.message.reply_to_message.from_user
+    chat_id = update.effective_chat.id
+
+    try:
+        await context.bot.ban_chat_member(chat_id, user_to_ban.id)
+        await update.message.delete()
+        await update.message.reply_text(f"🚫 Пользователь {user_to_ban.mention_html()} был забанен.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Не удалось забанить пользователя. Причина: {e}")
+        
 async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commands_text = (
         "🛠 <b>Команды администратора:</b>\n\n"
-        "⚠️ <b>/warn</b> — выдать предупреждение. После 2-х — мут на 24 часа.\n"
-        "♻️ <b>/unwarn</b> — убрать предупреждение.\n"
-        "🔇 <b>/mut 5m</b> — замутить пользователя на указанное время (например, 5m, 2h).\n"
-        "🔊 <b>/unmut</b> — снять мут досрочно.\n"
-        "📊 <b>/rep</b> — посмотреть репутацию пользователя.\n"
+        "⚠️ <b>/warn @user</b> — выдать предупреждение. После 2-х — мут на 24 часа.\n"
+        "♻️ <b>/unwarn @user</b> — убрать предупреждение.\n"
+        "🔇 <b>/mut @user 5m</b> — замутить пользователя на указанное время (например, 5m, 2h).\n"
+        "🔊 <b>/unmut @user</b> — снять мут досрочно.\n"
+        "🔨 <b>/ban @user</b> — забанить (удалить) пользователя из группы.\n"
+        "📊 <b>/rep @user</b> — посмотреть репутацию пользователя (преды и муты).\n"
         "📋 <b>/admininfo</b> — список всех админ-команд.\n\n"
         "⏳ <i>Автоматически:</i>\n"
         "— После двух /warn пользователь мутится на 24ч.\n"
@@ -161,6 +198,7 @@ async def main():
     app.add_handler(CommandHandler("unmut", unmut))
     app.add_handler(CommandHandler("unwarn", unwarn))
     app.add_handler(CommandHandler("rep", rep))
+    application.add_handler(CommandHandler("ban", ban))
     app.add_handler(CommandHandler("admininfo", admininfo))
 
     print("Бот запущен...")
