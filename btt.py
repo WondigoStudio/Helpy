@@ -5,9 +5,21 @@ from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions
 from aiohttp import web
 import re
+from flask import Flask
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes
 )
+ 
+@app.route('/')
+def index():
+    return "Сервер работает!"
+async def start_web_app():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    await site.start()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,13 +38,7 @@ conn.commit()
 async def handle(request):
     return web.Response(text="Бот работает!")
 
-async def start_webserver():
-    app = web.Application()
-    app.router.add_get('/', handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 10000)  # Port 10000 (any open port)
-    await site.start() 
+
     
 def parse_duration(duration: str):
     try:
@@ -251,8 +257,9 @@ async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(commands_text, parse_mode="HTML")
 
 async def main():
+    await start_web_app()
     app = ApplicationBuilder().token("8093659364:AAGuO6e9QSzTfGlLOmgr57NJqW3a7yrq4Gg").build()
-
+    
     app.add_handler(CommandHandler("warn", warn))
     app.add_handler(CommandHandler("mut", mut))
     app.add_handler(CommandHandler("unmut", unmut))
@@ -262,10 +269,8 @@ async def main():
     app.add_handler(CommandHandler("admininfo", admininfo))
 
     print("Бот запущен...")
-    await asyncio.gather(
-        app.run_polling(),
-        start_webserver()
-    )
+    asyncio.run(main())
+    
 if __name__ == "__main__":
     import nest_asyncio
     nest_asyncio.apply()
