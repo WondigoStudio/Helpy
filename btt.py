@@ -152,20 +152,69 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("У пользователя нет предупреждений.")
 
+from telegram import User
+from telegram.ext import ContextTypes
+import re
+
 async def rep(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Используйте /rep в ответ на сообщение пользователя.")
+    chat_id = update.effective_chat.id
+
+    # 1. Получить пользователя из ответа или аргументов
+    user = None
+
+    # Если это ответ на сообщение — используем его
+    if update.message.reply_to_message:
+        user = update.message.reply_to_message.from_user
+
+    # Иначе пробуем извлечь @username или user_id из аргумента команды
+    elif context.args:
+        arg = context.args[0]
+
+        # Попробуем получить по user_id
+        if arg.isdigit():
+            try:
+                user = await context.bot.get_chat_member(chat_id, int(arg))
+                user = user.user
+            except:
+                await update.message.reply_text("Не удалось найти пользователя по ID.")
+                return
+
+        # Попробуем получить по @username
+        elif arg.startswith("@"):
+            try:
+                user = await context.bot.get_chat(arg)
+                if not isinstance(user, User):
+                    await update.message.reply_text("Пользователь не найден или это не личный аккаунт.")
+                    return
+            except:
+                await update.message.reply_text("Пользователь с таким юзернеймом не найден.")
+                return
+        else:
+            await update.message.reply_text("Неверный формат. Укажите ID или @username.")
+            return
+    else:
+        await update.message.reply_text("Используйте /rep в ответ на сообщение или укажите @username/ID.")
         return
 
-    user = update.message.reply_to_message.from_user
-    chat_id = update.effective_chat.id
+    # Обновление и получение данных
     await update_user(user.id, chat_id)
     c.execute("SELECT warns, mutes, mute_until FROM users WHERE user_id=? AND chat_id=?", (user.id, chat_id))
-    warns, mutes, mute_until = c.fetchone()
-    mute_status = "Мут до " + mute_until if mute_until else "Не в муте"
+    result = c.fetchone()
+    if not result:
+        await update.message.reply_text("Нет информации о пользователе.")
+        return
+
+    warns, mutes, mute_until = result
+    mute_status = f"Мут до {mute_until}" if mute_until else "Не в муте"
+
     await update.message.reply_text(
-        f"Статистика {user.mention_html()}\nПредупреждений: {warns}\nМутов: {mutes}\nСостояние: {mute_status}",
-        parse_mode='HTML')
+        f"Статистика {user.mention_html()}\n"
+        f"Предупреждений: {warns}\n"
+        f"Мутов: {mutes}\n"
+        f"Состояние: {mute_status}",
+        parse_mode='HTML'
+    )
+
     
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
@@ -199,7 +248,7 @@ async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(commands_text, parse_mode="HTML")
 
 async def main():
-    app = ApplicationBuilder().token("8093659364:AAFhKfj1MeHxbVX5j1zqliQAaev9N_-QGII").build()
+    app = ApplicationBuilder().token("8093659364:AAGuO6e9QSzTfGlLOmgr57NJqW3a7yrq4Gg").build()
 
     app.add_handler(CommandHandler("warn", warn))
     app.add_handler(CommandHandler("mut", mut))
