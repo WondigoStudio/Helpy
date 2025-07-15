@@ -273,5 +273,5 @@ if __name__ == "__main__":
     nest_asyncio.apply()
 
     # Без проверки get_running_loop, просто запускаем
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
 
