@@ -3,6 +3,7 @@ import sqlite3
 import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions
+from aiohttp import web
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes
 )
@@ -39,6 +40,11 @@ def parse_duration(duration: str):
             return int(duration[:-1]) * 86400
     except:
         return None
+async def update_user(user_id, chat_id):
+    c.execute("SELECT * FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
+    if not c.fetchone():
+        c.execute("INSERT INTO users (user_id, chat_id) VALUES (?, ?)", (user_id, chat_id))
+        conn.commit()
 
 async def unmute_later(context, chat_id, user_id, until):
     delay = (until - datetime.utcnow()).total_seconds()
