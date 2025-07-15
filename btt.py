@@ -21,13 +21,14 @@ c.execute('''
     )
 ''')
 conn.commit()
-
-async def update_user(user_id, chat_id):
-    c.execute("SELECT * FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
-    if not c.fetchone():
-        c.execute("INSERT INTO users (user_id, chat_id, warns, mutes) VALUES (?, ?, 0, 0)", (user_id, chat_id))
-        conn.commit()
-
+async def start_webserver():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 10000)  # Port 10000 (any open port)
+    await site.start() 
+    
 def parse_duration(duration: str):
     try:
         if duration.endswith("m"):
@@ -202,7 +203,10 @@ async def main():
     app.add_handler(CommandHandler("admininfo", admininfo))
 
     print("Бот запущен...")
-    await app.run_polling()
+    await asyncio.gather(
+        app.run_polling(),
+        start_webserver()
+    )
 if __name__ == "__main__":
     import nest_asyncio
     nest_asyncio.apply()
