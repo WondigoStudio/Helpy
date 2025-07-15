@@ -198,7 +198,7 @@ async def main():
     app.add_handler(CommandHandler("unmut", unmut))
     app.add_handler(CommandHandler("unwarn", unwarn))
     app.add_handler(CommandHandler("rep", rep))
-    application.add_handler(CommandHandler("ban", ban))
+    app.add_handler(CommandHandler("ban", ban))
     app.add_handler(CommandHandler("admininfo", admininfo))
 
     print("Бот запущен...")
