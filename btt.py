@@ -240,7 +240,7 @@ async def admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(commands_text, parse_mode="HTML")
 
 async def main():
-    app = ApplicationBuilder().token("8093659364:AAGKm3-8QLlf5KiuFEuWJfF8h8h8iEsU89o").build()
+    app = ApplicationBuilder().token("8093659364:AAFhKfj1MeHxbVX5j1zqliQAaev9N_-QGII").build()
 
     app.add_handler(CommandHandler("warn", warn))
     app.add_handler(CommandHandler("mut", mut))
